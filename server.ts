@@ -165,6 +165,15 @@ function extractToken(req: Request): string | null {
   return null;
 }
 
+function normalizePinInput(input: string): string {
+  // Strip invisible Unicode directional/zero-width marks and convert Arabic/Eastern-Arabic digits to ASCII 0-9
+  return input
+    .replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g, '')
+    .trim()
+    .replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 0x06f0));
+}
+
 async function startServer() {
   // Ensure initial server-side auth record exists
   ensureAuthRecord();
@@ -198,7 +207,7 @@ async function startServer() {
       return;
     }
 
-    const pin = typeof req.body?.pin === 'string' ? req.body.pin.trim() : '';
+    const pin = typeof req.body?.pin === 'string' ? normalizePinInput(req.body.pin) : '';
     if (!pin) {
       res.status(400).json({
         valid: false,
@@ -242,8 +251,8 @@ async function startServer() {
       return;
     }
 
-    const currentPin = typeof req.body?.currentPin === 'string' ? req.body.currentPin.trim() : '';
-    const newPin = typeof req.body?.newPin === 'string' ? req.body.newPin.trim() : '';
+    const currentPin = typeof req.body?.currentPin === 'string' ? normalizePinInput(req.body.currentPin) : '';
+    const newPin = typeof req.body?.newPin === 'string' ? normalizePinInput(req.body.newPin) : '';
 
     if (!currentPin || !newPin) {
       res.status(400).json({

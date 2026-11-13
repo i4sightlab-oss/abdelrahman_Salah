@@ -1,4 +1,4 @@
-import { Download, Edit3, KeyRound, Lock, PlusCircle, RefreshCw, Save, Settings, ShieldCheck, Trash2, Upload } from 'lucide-react';
+import { Download, Edit3, Eye, EyeOff, KeyRound, Lock, PlusCircle, RefreshCw, Save, Settings, ShieldCheck, Trash2, Upload } from 'lucide-react';
 import React, { useState } from 'react';
 import { soundEffects } from '../../services/soundEffects';
 import { storageService } from '../../services/storageService';
@@ -22,12 +22,14 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState<string | null>(null);
   const [isVerifyingPin, setIsVerifyingPin] = useState(false);
+  const [showUnlockPin, setShowUnlockPin] = useState(false);
   const [activeTab, setActiveTab] = useState<'words' | 'addWord' | 'addStory' | 'data' | 'settings'>('words');
 
   // Change PIN Form State
   const [currentPinInput, setCurrentPinInput] = useState('');
   const [newPinInput, setNewPinInput] = useState('');
   const [confirmPinInput, setConfirmPinInput] = useState('');
+  const [showSettingsPins, setShowSettingsPins] = useState(false);
   const [pinChangeError, setPinChangeError] = useState<string | null>(null);
   const [pinChangeSuccess, setPinChangeSuccess] = useState<string | null>(null);
   const [isUpdatingPin, setIsUpdatingPin] = useState(false);
@@ -72,7 +74,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   // Authenticate PIN securely on the server
   const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pinInput.trim()) {
+    const cleanedPin = pinInput.replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g, '').trim();
+    if (!cleanedPin) {
       soundEffects.playTryAgain();
       setPinError('Please enter your dashboard access PIN. / يرجى إدخال الرقم السري.');
       return;
@@ -85,15 +88,16 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
       const response = await fetch('/api/teacher/verify-pin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin: pinInput.trim() }),
+        body: JSON.stringify({ pin: cleanedPin }),
       });
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
 
       if (response.ok && data.valid && data.token) {
         soundEffects.playSuccess();
         setSessionToken(data.token);
         setIsAuthenticated(true);
         setPinInput('');
+        setShowUnlockPin(false);
         setPinError(null);
       } else {
         soundEffects.playTryAgain();
@@ -113,10 +117,12 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     setIsAuthenticated(false);
     setSessionToken(null);
     setPinInput('');
+    setShowUnlockPin(false);
     setPinError(null);
     setCurrentPinInput('');
     setNewPinInput('');
     setConfirmPinInput('');
+    setShowSettingsPins(false);
     setPinChangeError(null);
     setPinChangeSuccess(null);
     try {
@@ -131,9 +137,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     setPinChangeError(null);
     setPinChangeSuccess(null);
 
-    const currentTrimmed = currentPinInput.trim();
-    const newTrimmed = newPinInput.trim();
-    const confirmTrimmed = confirmPinInput.trim();
+    const strip = (s: string) => s.replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g, '').trim();
+    const currentTrimmed = strip(currentPinInput);
+    const newTrimmed = strip(newPinInput);
+    const confirmTrimmed = strip(confirmPinInput);
 
     if (!currentTrimmed || !newTrimmed || !confirmTrimmed) {
       soundEffects.playTryAgain();
@@ -166,7 +173,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           newPin: newTrimmed,
         }),
       });
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
 
       if (response.ok && data.success) {
         if (data.token) {
@@ -176,6 +183,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         setCurrentPinInput('');
         setNewPinInput('');
         setConfirmPinInput('');
+        setShowSettingsPins(false);
         setPinChangeSuccess('Dashboard access PIN updated successfully! / تم تحديث الرقم السري بنجاح.');
         showNotification('Dashboard access PIN updated!');
       } else {
@@ -365,19 +373,33 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
         <form onSubmit={handlePinSubmit} className="space-y-4">
           <div>
-            <input
-              type="password"
-              maxLength={32}
-              autoComplete="current-password"
-              value={pinInput}
-              onChange={(e) => {
-                setPinInput(e.target.value);
-                if (pinError) setPinError(null);
-              }}
-              placeholder="Enter access PIN"
-              disabled={isVerifyingPin}
-              className="w-full text-center text-lg font-black tracking-widest py-3 rounded-2xl border-2 border-amber-300 focus:outline-none focus:border-blue-600 shadow-2xs disabled:opacity-60"
-            />
+            <div className="relative">
+              <input
+                type={showUnlockPin ? 'text' : 'password'}
+                dir="ltr"
+                maxLength={32}
+                autoComplete="current-password"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                value={pinInput}
+                onChange={(e) => {
+                  setPinInput(e.target.value);
+                  if (pinError) setPinError(null);
+                }}
+                placeholder="Enter access PIN"
+                disabled={isVerifyingPin}
+                className="w-full text-center text-lg font-black tracking-widest py-3 px-11 rounded-2xl border-2 border-amber-300 focus:outline-none focus:border-blue-600 shadow-2xs disabled:opacity-60"
+              />
+              <button
+                type="button"
+                onClick={() => setShowUnlockPin((prev) => !prev)}
+                aria-label={showUnlockPin ? 'Hide PIN' : 'Show PIN'}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
+              >
+                {showUnlockPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
             {pinError && (
               <p role="alert" className="text-xs text-rose-600 font-bold mt-2 leading-relaxed">
                 {pinError}
@@ -908,14 +930,32 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           </div>
 
           <form onSubmit={handleChangePin} className="max-w-md space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-500">
+                Use lowercase letters or numbers (4–32 chars)
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowSettingsPins((prev) => !prev)}
+                className="inline-flex items-center gap-1 text-xs font-bold text-slate-600 hover:text-slate-900 px-2 py-1 rounded-lg hover:bg-slate-100 transition"
+              >
+                {showSettingsPins ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                <span>{showSettingsPins ? 'Hide' : 'Show'}</span>
+              </button>
+            </div>
+
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
                 Current Access PIN *
               </label>
               <input
-                type="password"
+                type={showSettingsPins ? 'text' : 'password'}
+                dir="ltr"
                 maxLength={32}
                 autoComplete="current-password"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 required
                 value={currentPinInput}
                 onChange={(e) => {
@@ -932,9 +972,13 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 New Access PIN (4–32 characters) *
               </label>
               <input
-                type="password"
+                type={showSettingsPins ? 'text' : 'password'}
+                dir="ltr"
                 maxLength={32}
                 autoComplete="new-password"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 required
                 value={newPinInput}
                 onChange={(e) => {
@@ -951,9 +995,13 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 Confirm New Access PIN *
               </label>
               <input
-                type="password"
+                type={showSettingsPins ? 'text' : 'password'}
+                dir="ltr"
                 maxLength={32}
                 autoComplete="new-password"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 required
                 value={confirmPinInput}
                 onChange={(e) => {
