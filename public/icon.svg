@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3B82F6"/>
+      <stop offset="50%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#1D4ED8"/>
+    </linearGradient>
+    <linearGradient id="sun" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FDE047"/>
+      <stop offset="100%" stop-color="#F59E0B"/>
+    </linearGradient>
+    <linearGradient id="book" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#F1F5F9"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FBBF24"/>
+      <stop offset="100%" stop-color="#D97706"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#0F172A" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Background rounded squircle with padding for maskable safe zone -->
+  <rect width="512" height="512" rx="128" fill="url(#bg)"/>
+
+  <!-- Cheerful Nile river ribbon at bottom -->
+  <path d="M0 430 C 130 400, 240 460, 512 420 L 512 512 L 0 512 Z" fill="#0284C7" opacity="0.6"/>
+  <path d="M0 460 C 180 430, 320 480, 512 450 L 512 512 L 0 512 Z" fill="#38BDF8" opacity="0.4"/>
+
+  <!-- Golden Egyptian sun rising -->
+  <circle cx="256" cy="180" r="75" fill="url(#sun)" filter="url(#shadow)"/>
+  <!-- Sun rays -->
+  <g stroke="#FDE047" stroke-width="8" stroke-linecap="round" opacity="0.8">
+    <line x1="256" y1="75" x2="256" y2="92"/>
+    <line x1="256" y1="268" x2="256" y2="285"/>
+    <line x1="151" y1="180" x2="168" y2="180"/>
+    <line x1="344" y1="180" x2="361" y2="180"/>
+    <line x1="182" y1="106" x2="194" y2="118"/>
+    <line x1="318" y1="242" x2="330" y2="254"/>
+    <line x1="182" y1="254" x2="194" y2="242"/>
+    <line x1="318" y1="118" x2="330" y2="106"/>
+  </g>
+
+  <!-- Cute smiling face on sun -->
+  <ellipse cx="236" cy="175" rx="6" ry="8" fill="#78350F"/>
+  <ellipse cx="276" cy="175" rx="6" ry="8" fill="#78350F"/>
+  <path d="M242 195 Q 256 210, 270 195" stroke="#78350F" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <circle cx="226" cy="188" r="5" fill="#F43F5E" opacity="0.6"/>
+  <circle cx="286" cy="188" r="5" fill="#F43F5E" opacity="0.6"/>
+
+  <!-- Twin stylized pyramids behind the book -->
+  <polygon points="120,330 190,230 250,330" fill="url(#gold)" opacity="0.85"/>
+  <polygon points="190,230 250,330 220,330" fill="#B45309" opacity="0.5"/>
+  <polygon points="260,330 330,245 390,330" fill="url(#gold)" opacity="0.85"/>
+  <polygon points="330,245 390,330 365,330" fill="#B45309" opacity="0.5"/>
+
+  <!-- Big Open Knowledge Book -->
+  <g filter="url(#shadow)">
+    <!-- Book cover/base -->
+    <path d="M90 320 C 170 300, 240 310, 256 325 C 272 310, 342 300, 422 320 L 416 395 C 340 375, 272 385, 256 398 C 240 385, 172 375, 96 395 Z" fill="#DC2626"/>
+    <!-- Left page -->
+    <path d="M100 310 C 170 295, 235 305, 252 320 L 252 388 C 235 375, 170 365, 100 380 Z" fill="url(#book)"/>
+    <!-- Right page -->
+    <path d="M412 310 C 342 295, 277 305, 260 320 L 260 388 C 277 375, 342 365, 412 380 Z" fill="url(#book)"/>
+    <!-- Center spine -->
+    <path d="M252 320 L 260 320 L 260 392 L 252 392 Z" fill="#E2E8F0"/>
+    
+    <!-- English letter "A" on left page -->
+    <text x="175" y="360" font-family="Arial, sans-serif" font-weight="900" font-size="44" fill="#2563EB" text-anchor="middle">A</text>
+    <!-- Arabic letter "أ" on right page -->
+    <text x="335" y="362" font-family="'Cairo', Arial, sans-serif" font-weight="900" font-size="46" fill="#10B981" text-anchor="middle">أ</text>
+  </g>
+
+  <!-- Sparkles -->
+  <circle cx="100" cy="140" r="8" fill="#FDE047"/>
+  <circle cx="410" cy="130" r="10" fill="#FDE047"/>
+  <polygon points="430,220 435,230 445,235 435,240 430,250 425,240 415,235 425,230" fill="#FCD34D"/>
+  <polygon points="85,240 89,248 97,252 89,256 85,264 81,256 73,252 81,248" fill="#FCD34D"/>
+</svg>

@@ -1,0 +1,6 @@
+{
+  "name": "NileKids English-Arabic Dictionary",
+  "description": "Interactive, child-friendly English-Arabic primary school dictionary with audio pronunciation, illustrated vocabulary, reading passages, games, irregular verbs, progress tracking, and offline PWA support.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
