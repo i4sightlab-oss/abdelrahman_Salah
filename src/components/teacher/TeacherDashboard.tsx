@@ -81,15 +81,28 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
       return;
     }
 
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      soundEffects.playTryAgain();
+      setPinError('You appear to be offline. Please connect to the internet to unlock the Teacher Dashboard.');
+      return;
+    }
+
     setIsVerifyingPin(true);
     setPinError(null);
 
     try {
       const response = await fetch('/api/teacher/verify-pin', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pin: cleanedPin }),
       });
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        soundEffects.playTryAgain();
+        setPinError('Could not reach the dashboard authentication service. Please refresh or re-publish the app and try again.');
+        return;
+      }
       const data = await response.json().catch(() => ({}));
 
       if (response.ok && data.valid && data.token) {
@@ -164,6 +177,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     try {
       const response = await fetch('/api/teacher/change-pin', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: {
           'Content-Type': 'application/json',
           ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}),
@@ -173,6 +187,12 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           newPin: newTrimmed,
         }),
       });
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        soundEffects.playTryAgain();
+        setPinChangeError('Could not reach the PIN update service. Please refresh or re-publish the app and try again.');
+        return;
+      }
       const data = await response.json().catch(() => ({}));
 
       if (response.ok && data.success) {

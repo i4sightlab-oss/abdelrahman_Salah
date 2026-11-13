@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import dotenv from 'dotenv';
 import express from 'express';
@@ -8,9 +9,11 @@ import type { Request, Response } from 'express';
 dotenv.config();
 
 const PORT = Number(process.env.PORT) || 3000;
-const DATA_DIR = path.resolve('.data');
-const AUTH_FILE = path.join(DATA_DIR, 'teacher-auth.json');
+const PRIMARY_DATA_DIR = path.resolve('.data');
+const FALLBACK_DATA_DIR = path.join(os.tmpdir(), 'nilekids-auth');
+const AUTH_FILENAME = 'teacher-auth.json';
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
+let memoryAuthRecord: StoredAuthRecord | null = null;
 
 interface StoredAuthRecord {
   salt: string;
@@ -76,21 +79,51 @@ function verifyPinHash(pin: string, record: StoredAuthRecord): boolean {
   return crypto.timingSafeEqual(candidate, stored);
 }
 
+function readAuthFromDir(dir: string): StoredAuthRecord | null {
+  const file = path.join(dir, AUTH_FILENAME);
+  if (!fs.existsSync(file)) return null;
+  try {
+    const raw = fs.readFileSync(file, 'utf-8');
+    const parsed = JSON.parse(raw) as Partial<StoredAuthRecord>;
+    if (parsed.salt && parsed.hash && parsed.sessionSecret) {
+      return parsed as StoredAuthRecord;
+    }
+  } catch {
+    // Ignore unreadable/corrupt file and try fallback
+  }
+  return null;
+}
+
+function writeAuthToDir(dir: string, record: StoredAuthRecord): boolean {
+  try {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    const file = path.join(dir, AUTH_FILENAME);
+    const tmpFile = `${file}.tmp`;
+    fs.writeFileSync(tmpFile, JSON.stringify(record, null, 2), { mode: 0o600 });
+    fs.renameSync(tmpFile, file);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function ensureAuthRecord(): StoredAuthRecord {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
+  const fromPrimary = readAuthFromDir(PRIMARY_DATA_DIR);
+  if (fromPrimary) {
+    memoryAuthRecord = fromPrimary;
+    return fromPrimary;
   }
 
-  if (fs.existsSync(AUTH_FILE)) {
-    try {
-      const raw = fs.readFileSync(AUTH_FILE, 'utf-8');
-      const parsed = JSON.parse(raw) as Partial<StoredAuthRecord>;
-      if (parsed.salt && parsed.hash && parsed.sessionSecret) {
-        return parsed as StoredAuthRecord;
-      }
-    } catch {
-      // Fall through to re-initialize
-    }
+  const fromFallback = readAuthFromDir(FALLBACK_DATA_DIR);
+  if (fromFallback) {
+    memoryAuthRecord = fromFallback;
+    return fromFallback;
+  }
+
+  if (memoryAuthRecord) {
+    return memoryAuthRecord;
   }
 
   const initialPin = process.env.TEACHER_DASHBOARD_PIN || 'nour2018';
@@ -101,17 +134,19 @@ function ensureAuthRecord(): StoredAuthRecord {
     sessionSecret: crypto.randomBytes(32).toString('hex'),
     updatedAt: new Date().toISOString(),
   };
-  fs.writeFileSync(AUTH_FILE, JSON.stringify(record, null, 2), { mode: 0o600 });
+  memoryAuthRecord = record;
+
+  if (!writeAuthToDir(PRIMARY_DATA_DIR, record)) {
+    writeAuthToDir(FALLBACK_DATA_DIR, record);
+  }
   return record;
 }
 
 function saveAuthRecord(record: StoredAuthRecord): void {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
+  memoryAuthRecord = record;
+  if (!writeAuthToDir(PRIMARY_DATA_DIR, record)) {
+    writeAuthToDir(FALLBACK_DATA_DIR, record);
   }
-  const tmpFile = `${AUTH_FILE}.tmp`;
-  fs.writeFileSync(tmpFile, JSON.stringify(record, null, 2), { mode: 0o600 });
-  fs.renameSync(tmpFile, AUTH_FILE);
 }
 
 function createSessionToken(secret: string): string {
@@ -313,11 +348,12 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     app.use(express.static(distDir));
-    app.get('{*splat}', (req: Request, res: Response, next) => {
+    app.get('*', (req: Request, res: Response, next) => {
       if (req.path.startsWith('/api/')) {
         next();
         return;
       }
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       res.sendFile(distIndex);
     });
   }
