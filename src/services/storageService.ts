@@ -6,7 +6,6 @@ const STORAGE_KEYS = {
   PASSAGES: 'nilekids_passages_v1',
   VERBS: 'nilekids_verbs_v1',
   PROGRESS: 'nilekids_progress_v1',
-  TEACHER_PIN: 'nilekids_teacher_pin_v1',
   SLOW_AUDIO: 'nilekids_slow_audio_v1',
 };
 
@@ -352,17 +351,6 @@ class StorageService {
     }
 
     progress.unlockedBadgeIds = Array.from(unlocked);
-  }
-
-  // --- TEACHER PIN ---
-  public getTeacherPin(): string {
-    if (typeof window === 'undefined') return '1234';
-    return localStorage.getItem(STORAGE_KEYS.TEACHER_PIN) || '1234';
-  }
-
-  public setTeacherPin(pin: string) {
-    if (typeof window === 'undefined') return;
-    localStorage.setItem(STORAGE_KEYS.TEACHER_PIN, pin);
   }
 
   // --- AUDIO SPEED PREFERENCE ---

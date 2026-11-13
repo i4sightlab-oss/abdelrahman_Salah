@@ -1,4 +1,4 @@
-import { Download, Edit3, KeyRound, Lock, PlusCircle, RefreshCw, Save, Trash2, Upload } from 'lucide-react';
+import { Download, Edit3, KeyRound, Lock, PlusCircle, RefreshCw, Save, Settings, ShieldCheck, Trash2, Upload } from 'lucide-react';
 import React, { useState } from 'react';
 import { soundEffects } from '../../services/soundEffects';
 import { storageService } from '../../services/storageService';
@@ -18,9 +18,19 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   onPassagesUpdated,
 }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [pinInput, setPinInput] = useState('');
-  const [pinError, setPinError] = useState(false);
-  const [activeTab, setActiveTab] = useState<'words' | 'addWord' | 'addStory' | 'data'>('words');
+  const [pinError, setPinError] = useState<string | null>(null);
+  const [isVerifyingPin, setIsVerifyingPin] = useState(false);
+  const [activeTab, setActiveTab] = useState<'words' | 'addWord' | 'addStory' | 'data' | 'settings'>('words');
+
+  // Change PIN Form State
+  const [currentPinInput, setCurrentPinInput] = useState('');
+  const [newPinInput, setNewPinInput] = useState('');
+  const [confirmPinInput, setConfirmPinInput] = useState('');
+  const [pinChangeError, setPinChangeError] = useState<string | null>(null);
+  const [pinChangeSuccess, setPinChangeSuccess] = useState<string | null>(null);
+  const [isUpdatingPin, setIsUpdatingPin] = useState(false);
 
   // Form State for Adding / Editing Word
   const [editingWordId, setEditingWordId] = useState<string | null>(null);
@@ -59,17 +69,124 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     setTimeout(() => setNotification(null), 3500);
   };
 
-  // Authenticate PIN
-  const handlePinSubmit = (e: React.FormEvent) => {
+  // Authenticate PIN securely on the server
+  const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const correctPin = storageService.getTeacherPin();
-    if (pinInput.trim() === correctPin || pinInput.trim() === '1234') {
-      soundEffects.playSuccess();
-      setIsAuthenticated(true);
-      setPinError(false);
-    } else {
+    if (!pinInput.trim()) {
       soundEffects.playTryAgain();
-      setPinError(true);
+      setPinError('Please enter your dashboard access PIN. / يرجى إدخال الرقم السري.');
+      return;
+    }
+
+    setIsVerifyingPin(true);
+    setPinError(null);
+
+    try {
+      const response = await fetch('/api/teacher/verify-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: pinInput.trim() }),
+      });
+      const data = await response.json();
+
+      if (response.ok && data.valid && data.token) {
+        soundEffects.playSuccess();
+        setSessionToken(data.token);
+        setIsAuthenticated(true);
+        setPinInput('');
+        setPinError(null);
+      } else {
+        soundEffects.playTryAgain();
+        setPinError(
+          data.error || 'That PIN is not quite right. Please check and try again.'
+        );
+      }
+    } catch {
+      soundEffects.playTryAgain();
+      setPinError('Unable to reach the server right now. Please check your connection and try again.');
+    } finally {
+      setIsVerifyingPin(false);
+    }
+  };
+
+  const handleLockDashboard = async () => {
+    setIsAuthenticated(false);
+    setSessionToken(null);
+    setPinInput('');
+    setPinError(null);
+    setCurrentPinInput('');
+    setNewPinInput('');
+    setConfirmPinInput('');
+    setPinChangeError(null);
+    setPinChangeSuccess(null);
+    try {
+      await fetch('/api/teacher/logout', { method: 'POST' });
+    } catch {
+      // Ignore network errors on lock
+    }
+  };
+
+  const handleChangePin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPinChangeError(null);
+    setPinChangeSuccess(null);
+
+    const currentTrimmed = currentPinInput.trim();
+    const newTrimmed = newPinInput.trim();
+    const confirmTrimmed = confirmPinInput.trim();
+
+    if (!currentTrimmed || !newTrimmed || !confirmTrimmed) {
+      soundEffects.playTryAgain();
+      setPinChangeError('Please fill in all PIN fields.');
+      return;
+    }
+
+    if (newTrimmed.length < 4 || newTrimmed.length > 32) {
+      soundEffects.playTryAgain();
+      setPinChangeError('New PIN must be between 4 and 32 characters long.');
+      return;
+    }
+
+    if (newTrimmed !== confirmTrimmed) {
+      soundEffects.playTryAgain();
+      setPinChangeError('New PIN and confirmation do not match.');
+      return;
+    }
+
+    setIsUpdatingPin(true);
+    try {
+      const response = await fetch('/api/teacher/change-pin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}),
+        },
+        body: JSON.stringify({
+          currentPin: currentTrimmed,
+          newPin: newTrimmed,
+        }),
+      });
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        if (data.token) {
+          setSessionToken(data.token);
+        }
+        soundEffects.playSuccess();
+        setCurrentPinInput('');
+        setNewPinInput('');
+        setConfirmPinInput('');
+        setPinChangeSuccess('Dashboard access PIN updated successfully! / تم تحديث الرقم السري بنجاح.');
+        showNotification('Dashboard access PIN updated!');
+      } else {
+        soundEffects.playTryAgain();
+        setPinChangeError(data.error || 'Could not update the PIN. Please try again.');
+      }
+    } catch {
+      soundEffects.playTryAgain();
+      setPinChangeError('Unable to reach the server. Please check your connection and try again.');
+    } finally {
+      setIsUpdatingPin(false);
     }
   };
 
@@ -250,30 +367,36 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           <div>
             <input
               type="password"
-              maxLength={6}
+              maxLength={32}
+              autoComplete="current-password"
               value={pinInput}
-              onChange={(e) => setPinInput(e.target.value)}
-              placeholder="Enter PIN (Default: 1234)"
-              className="w-full text-center text-lg font-black tracking-widest py-3 rounded-2xl border-2 border-amber-300 focus:outline-none focus:border-blue-600 shadow-2xs"
+              onChange={(e) => {
+                setPinInput(e.target.value);
+                if (pinError) setPinError(null);
+              }}
+              placeholder="Enter access PIN"
+              disabled={isVerifyingPin}
+              className="w-full text-center text-lg font-black tracking-widest py-3 rounded-2xl border-2 border-amber-300 focus:outline-none focus:border-blue-600 shadow-2xs disabled:opacity-60"
             />
             {pinError && (
-              <p className="text-xs text-rose-600 font-bold mt-1">
-                Incorrect PIN. Default is 1234.
+              <p role="alert" className="text-xs text-rose-600 font-bold mt-2 leading-relaxed">
+                {pinError}
               </p>
             )}
           </div>
 
           <button
             type="submit"
-            className="w-full py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm shadow-md transition tap-active flex items-center justify-center gap-2"
+            disabled={isVerifyingPin}
+            className="w-full py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-extrabold text-sm shadow-md transition tap-active flex items-center justify-center gap-2"
           >
             <KeyRound className="w-4 h-4" />
-            <span>Unlock Dashboard / دخول</span>
+            <span>{isVerifyingPin ? 'Verifying... / جاري التحقق' : 'Unlock Dashboard / دخول'}</span>
           </button>
         </form>
 
         <div className="mt-4 pt-4 border-t border-slate-100 text-[11px] text-slate-400">
-          Default safety PIN is <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-600 font-bold">1234</code>.
+          Protected area for teachers and parents. / مخصص للمعلمين وأولياء الأمور فقط.
         </div>
       </div>
     );
@@ -303,7 +426,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         </div>
 
         <button
-          onClick={() => setIsAuthenticated(false)}
+          onClick={handleLockDashboard}
           className="self-start sm:self-auto px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300 transition"
         >
           Lock / خروج
@@ -357,6 +480,21 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         >
           <RefreshCw className="w-3.5 h-3.5" />
           <span>Backup & Sync</span>
+        </button>
+        <button
+          onClick={() => {
+            setPinChangeError(null);
+            setPinChangeSuccess(null);
+            setActiveTab('settings');
+          }}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-2xl text-xs font-extrabold whitespace-nowrap transition tap-active border ${
+            activeTab === 'settings'
+              ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+          }`}
+        >
+          <Settings className="w-3.5 h-3.5" />
+          <span>Dashboard Settings</span>
         </button>
       </div>
 
@@ -749,6 +887,105 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
               Reset to Defaults
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Tab 5: Dashboard Settings (Admin PIN Management) */}
+      {activeTab === 'settings' && (
+        <div className="rounded-3xl bg-white border-2 border-slate-200 p-5 sm:p-7 shadow-xs space-y-6">
+          <div className="flex items-start gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-base font-extrabold text-slate-900">
+                Dashboard Security & Access PIN / إعدادات الأمان والرقم السري
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Update the Teacher & Parent Dashboard access PIN. All PIN checks and updates are validated securely on the server.
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleChangePin} className="max-w-md space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Current Access PIN *
+              </label>
+              <input
+                type="password"
+                maxLength={32}
+                autoComplete="current-password"
+                required
+                value={currentPinInput}
+                onChange={(e) => {
+                  setCurrentPinInput(e.target.value);
+                  if (pinChangeError) setPinChangeError(null);
+                }}
+                placeholder="Enter current PIN"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold focus:outline-none focus:border-blue-600"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                New Access PIN (4–32 characters) *
+              </label>
+              <input
+                type="password"
+                maxLength={32}
+                autoComplete="new-password"
+                required
+                value={newPinInput}
+                onChange={(e) => {
+                  setNewPinInput(e.target.value);
+                  if (pinChangeError) setPinChangeError(null);
+                }}
+                placeholder="Enter new PIN"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold focus:outline-none focus:border-blue-600"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Confirm New Access PIN *
+              </label>
+              <input
+                type="password"
+                maxLength={32}
+                autoComplete="new-password"
+                required
+                value={confirmPinInput}
+                onChange={(e) => {
+                  setConfirmPinInput(e.target.value);
+                  if (pinChangeError) setPinChangeError(null);
+                }}
+                placeholder="Re-enter new PIN"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold focus:outline-none focus:border-blue-600"
+              />
+            </div>
+
+            {pinChangeError && (
+              <div role="alert" className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs font-bold text-rose-700">
+                {pinChangeError}
+              </div>
+            )}
+
+            {pinChangeSuccess && (
+              <div role="status" className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-700">
+                {pinChangeSuccess}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={isUpdatingPin}
+              className="px-6 py-2.5 rounded-2xl bg-slate-900 hover:bg-slate-800 disabled:bg-slate-500 text-white font-extrabold text-xs shadow-md transition tap-active flex items-center gap-2"
+            >
+              <KeyRound className="w-4 h-4" />
+              <span>{isUpdatingPin ? 'Updating PIN...' : 'Update Access PIN / تحديث الرقم السري'}</span>
+            </button>
+          </form>
         </div>
       )}
     </div>
