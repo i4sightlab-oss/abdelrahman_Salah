@@ -100,7 +100,11 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
       const contentType = response.headers.get('content-type') || '';
       if (!contentType.includes('application/json')) {
         soundEffects.playTryAgain();
-        setPinError('Could not reach the dashboard authentication service. Please refresh or re-publish the app and try again.');
+        if (response.redirected || response.url.includes('__cookie_check')) {
+          setPinError('Your browser session needs to be refreshed. Please reload this page and try again.');
+        } else {
+          setPinError('Dashboard server authentication is not active on this hosted URL. Please run with the Node server (npm run start) or use the AI Studio Preview.');
+        }
         return;
       }
       const data = await response.json().catch(() => ({}));
